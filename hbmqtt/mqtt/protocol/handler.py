@@ -439,18 +439,17 @@ class ProtocolHandler:
         self.logger.debug("Reader coro stopped")
         yield from self.stop()
 
-    @asyncio.coroutine
-    def _send_packet(self, packet):
+    async def _send_packet(self, packet):
         try:
-            with (yield from self._write_lock):
-                yield from packet.to_stream(self.writer)
+            async with self._write_lock:
+                await packet.to_stream(self.writer)
             if self._keepalive_task:
                 self._keepalive_task.cancel()
                 self._keepalive_task = self._loop.call_later(self.keepalive_timeout, self.handle_write_timeout)
 
-            yield from self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=packet, session=self.session)
+            await self.plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=packet, session=self.session)
         except (ConnectionResetError, BrokenPipeError):
-            yield from self.handle_connection_closed()
+            await self.handle_connection_closed()
         except asyncio.CancelledError:
             raise
         except BaseException as e:
